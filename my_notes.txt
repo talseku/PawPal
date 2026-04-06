@@ -1,0 +1,188 @@
+====================================================
+  PawPal+ — Project Notes, Requirements & Edge Cases
+====================================================
+
+-------------------
+1. PROJECT OVERVIEW
+-------------------
+PawPal+ is a Streamlit-based pet care planning assistant.
+The goal: help a busy pet owner build and explain a daily care schedule
+for their pet(s), factoring in task priorities, durations, and owner constraints.
+
+Tech stack:
+  - Frontend/UI: Streamlit (app.py)
+  - Backend logic: Python classes (scheduler, tasks, owner, pet)
+  - Testing: pytest
+  - Dependencies: streamlit>=1.30, pytest>=7.0
+
+Workflow order (from README):
+  1. Identify requirements and edge cases (this file)
+  2. Draft UML diagram (classes, attributes, methods, relationships)
+  3. Convert UML to Python class stubs (no logic yet)
+  4. Implement scheduling logic incrementally
+  5. Add tests for key behaviors
+  6. Connect logic to Streamlit UI in app.py
+  7. Refine UML to match what was actually built
+
+-------------------
+2. REQUIREMENTS
+-------------------
+
+--- 2a. Owner Info ---
+  - ownerName       (string, required)
+  - ownerPhone      (string, optional but useful for vet contacts)
+  - ownerEmail      (string, optional)
+  - petInsurance    (bool or string — yes/no or provider name)
+  - availableHours  (float — how many hours the owner has today for pet care)
+  - preferences     (list/dict — e.g., prefers morning tasks, dislikes long evening walks)
+
+--- 2b. Pet Info ---
+  - petName         (string, required)
+  - petAge          (int or float — years, required)
+  - species         (string: "dog", "cat", "other", required)
+  - breed           (string, optional — affects activity needs)
+  - weight          (float, optional — affects feeding/medication dosing context)
+  - medicalNotes    (string, optional — e.g., "diabetic", "on heart meds", "joint issues")
+
+--- 2c. Task Info (each task must have at minimum) ---
+  - title           (string, required — e.g., "Morning walk", "Administer insulin")
+  - duration        (int, minutes, required — min 1, max 240 per app.py)
+  - priority        (enum: "low" | "medium" | "high", required)
+  - category        (string, optional — "feeding", "exercise", "medication", "grooming",
+                     "enrichment", "vet", "other")
+  - timeOfDay       (string, optional — "morning", "afternoon", "evening", "anytime")
+  - recurring       (bool, optional — is this a daily task?)
+  - notes           (string, optional — any special instructions)
+  - location        (string, optional — where the task takes place, e.g., "park", "home", "vet clinic")
+
+--- 2d. Scheduler / Plan Generation ---
+  - Accept a list of tasks and a total available time budget (in minutes)
+  - Select which tasks fit within the time budget
+  - Order tasks by priority (high -> medium -> low)
+  - Break ties with shorter duration first (gets more done)
+  - If timeOfDay is specified, respect it during ordering
+  - Output a sequential daily schedule with start/end times
+  - Explain why each task was included or excluded
+  - Flag if any HIGH priority tasks could not be scheduled (not enough time)
+
+--- 2e. UI Requirements ---
+  - Form to enter owner info
+  - Form to enter pet info
+  - Add/edit/remove tasks (with title, duration, priority at minimum)
+  - "Generate Schedule" button that calls the scheduler
+  - Display the resulting schedule as a table or timeline
+  - Show reasoning/explanation alongside the schedule
+  - Persist task list across reruns using st.session_state
+
+-------------------
+3. EDGE CASES
+-------------------
+
+--- 3a. Input Validation ---
+  - Owner name is empty or whitespace only → show error, block schedule generation
+  - Pet name is empty → show error
+  - Duration = 0 or negative → should be blocked (UI enforces min=1, validate in backend too)
+  - Duration > 24 hours (e.g., 1440+ minutes) → warn or cap; no single task can take all day
+  - Priority not in ["low", "medium", "high"] → reject or default to "low"
+  - availableHours = 0 → no tasks can be scheduled; display friendly message
+  - availableHours is very large (e.g., 24 hours) → schedule all tasks, no exclusions
+
+--- 3b. Task List Edge Cases ---
+  - No tasks added → "Generate Schedule" should show a message, not crash
+  - One task → schedule it if it fits, explain why if not
+  - All tasks are HIGH priority → schedule as many as fit by duration, shortest first
+  - All tasks are LOW priority → same logic; lower bar for exclusion explanation
+  - Duplicate task titles → allowed, but worth noting in the plan
+  - Single task longer than total available time → cannot schedule it; must flag it
+  - Total task time exactly equals available time → schedule all tasks (boundary case)
+  - Total task time is 1 minute over budget → drop the lowest priority task
+
+--- 3c. Scheduling Logic Edge Cases ---
+  - Two tasks with same priority and same duration → tie-break by insertion order (FIFO)
+  - Task with timeOfDay="morning" but owner only has afternoon time → still schedule it
+    (timeOfDay is a preference, not a hard constraint, unless you choose to enforce it)
+  - Medication tasks: should always be HIGH priority regardless of user input
+    (consider enforcing this or at least warning if a med task is set to low)
+  - Task list changes after schedule is generated → require re-generation; don't auto-update
+  - Very large task list (50+ tasks) → scheduler should handle it without crashing;
+    performance is not critical here but logic must remain correct
+
+--- 3d. Pet-Specific Edge Cases ---
+  - Very young pet (age < 1 year) → may need more frequent feeding; note in schedule
+  - Senior pet (age > 10 for dogs, >12 for cats) → reduced exercise duration advisable
+  - Species = "other" → no species-specific rules apply; treat generically
+  - Medical notes present → flag that medication/vet tasks should not be dropped even if
+    time is tight (scheduler should protect HIGH priority tasks)
+  - Pet age entered as 0 → valid (puppy/kitten under 1 year); don't reject
+
+--- 3e. UI / State Edge Cases ---
+  - User clicks "Generate Schedule" before adding any tasks → friendly error, not a crash
+  - User removes all tasks after generating a schedule → stale schedule still shown;
+    consider clearing it when the task list changes
+  - Streamlit re-runs on every widget interaction → use st.session_state carefully to avoid
+    resetting tasks or schedule unexpectedly
+  - Owner info not filled in when generating → either block with error or use defaults
+
+-------------------
+4. CLASS / DESIGN HINTS
+-------------------
+Suggested classes for UML:
+
+  Owner
+    - name, phone, email, pet_insurance, available_minutes, preferences
+
+  Pet
+    - name, age, species, breed, weight, medical_notes
+
+  Task
+    - title, duration_minutes, priority, category, time_of_day, recurring, notes
+
+  Scheduler
+    - owner: Owner
+    - pet: Pet
+    - tasks: list[Task]
+    - generate_plan() -> Plan
+    - _sort_tasks() (helper: sort by priority, then duration)
+    - _fits_in_budget(task, remaining_minutes) -> bool
+
+  Plan (or Schedule)
+    - scheduled_tasks: list[Task]
+    - skipped_tasks: list[Task]
+    - start_time: datetime or string
+    - explain() -> str  (returns human-readable reasoning)
+    - to_table() -> list[dict]  (for Streamlit st.table())
+
+Priority ordering (internal numeric mapping):
+  "high"   -> 3
+  "medium" -> 2
+  "low"    -> 1
+
+-------------------
+5. TESTING CHECKLIST (pytest)
+-------------------
+Key behaviors to test:
+  [ ] Scheduler returns empty plan when task list is empty
+  [ ] High priority task is always scheduled before lower priority task
+  [ ] Task exceeding remaining time is skipped
+  [ ] Skipped tasks appear in plan.skipped_tasks
+  [ ] Total scheduled duration does not exceed available_minutes
+  [ ] When total task time == available_minutes, all tasks are scheduled
+  [ ] When total task time == available_minutes + 1, the lowest priority task is dropped
+  [ ] Ties in priority broken by shorter duration first
+  [ ] Plan explanation lists both scheduled and skipped tasks with reasons
+  [ ] Owner with 0 available minutes results in all tasks skipped
+
+-------------------
+6. NOTES & REMINDERS
+-------------------
+  - Keep pawpal_system.py (or equivalent backend file) separate from app.py
+    so business logic can be tested independently of Streamlit
+  - app.py should only import from the backend and call Streamlit display functions
+  - Use st.session_state for: tasks list, generated plan, owner/pet info
+  - The scheduler does NOT need to be optimal (no need for dynamic programming);
+    a greedy priority-then-duration approach is sufficient for this project
+  - Reflection.md must be filled out after implementation — it asks about design
+    decisions, tradeoffs, AI collaboration, and testing confidence
+  - availableHours in the UI should be converted to minutes before passing to Scheduler
+  - String priorities ("high"/"medium"/"low") should be mapped to ints internally
+    so sorting works correctly
