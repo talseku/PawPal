@@ -1,3 +1,4 @@
+from datetime import date
 from pawpal_system import Owner, Pet, Task, Scheduler, Priority
 
 # ── Pets ──────────────────────────────────────────────────────────
@@ -10,7 +11,7 @@ mochi.add_task(Task(
     duration_minutes=30,
     priority=Priority.HIGH,
     category="exercise",
-    time_of_day="morning",
+    start_time="07:00",
     location="park",
 ))
 mochi.add_task(Task(
@@ -18,15 +19,22 @@ mochi.add_task(Task(
     duration_minutes=10,
     priority=Priority.HIGH,
     category="feeding",
-    time_of_day="morning",
+    start_time="07:30",
 ))
 mochi.add_task(Task(
     title="Afternoon play session",
     duration_minutes=20,
     priority=Priority.MEDIUM,
     category="enrichment",
-    time_of_day="afternoon",
+    start_time="14:00",
     location="home",
+))
+mochi.add_task(Task(
+    title="Quick grooming check",
+    duration_minutes=15,
+    priority=Priority.LOW,
+    category="grooming",
+    start_time="07:15",  # overlaps: Morning walk runs 07:00–07:30
 ))
 
 # ── Tasks for Luna ────────────────────────────────────────────────
@@ -35,7 +43,9 @@ luna.add_task(Task(
     duration_minutes=5,
     priority=Priority.HIGH,
     category="medication",
-    time_of_day="morning",
+    start_time="08:00",
+    frequency="daily",
+    due_date=date.today(),
     notes="Mix with small amount of wet food",
 ))
 luna.add_task(Task(
@@ -43,14 +53,14 @@ luna.add_task(Task(
     duration_minutes=15,
     priority=Priority.LOW,
     category="grooming",
-    time_of_day="evening",
+    start_time="19:00",
 ))
 luna.add_task(Task(
     title="Dinner",
     duration_minutes=10,
     priority=Priority.HIGH,
     category="feeding",
-    time_of_day="evening",
+    start_time="18:00",
 ))
 
 # ── Owner ─────────────────────────────────────────────────────────
@@ -116,5 +126,10 @@ if high_skipped:
     print("  ! WARNING: the following HIGH priority tasks were not scheduled:")
     for row in high_skipped:
         print(f"    - {row['title']}")
+
+if plan.warnings:
+    print()
+    for w in plan.warnings:
+        print(f"  ! {w}")
 
 divider("=")
