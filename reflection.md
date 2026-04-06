@@ -15,14 +15,11 @@ Based on the AI feedback, I added a direct mapping of priority strings to intege
 ## 2. Scheduling Logic and Tradeoffs
 
 **a. Constraints and priorities**
-
-- What constraints does your scheduler consider (for example: time, priority, preferences)?
-- How did you decide which constraints mattered most?
+The constraints that my scheduler accounts for include task priority as well as time/duration/conflicts.
+To decide which constraints mattered most, I considered the application's context from the user's perspective. If I were attempting to prioritize and schedule pet care for my pets, I would first want to address the most critical tasks that can not be skipped. Then, I might want to complete as many small tasks as possible, to leave long, unimportant tasks for last.
 
 **b. Tradeoffs**
-
-- Describe one tradeoff your scheduler makes.
-- Why is that tradeoff reasonable for this scenario?
+One of the tradeoffs my scheduler makes is that some tasks are skipped in the scheduling process when they do not fit into the schedule (even though they might if the schedule was rearranged). In my opinion, this tradeoff is reasonable in this scenario because it naturally makes more sense for humans to plan their days by scheduling tasks in sequential order, even if it means that the schedule isn't the 100% most time-efficient.
 
 ---
 
